@@ -20,12 +20,9 @@ Resources:
       CodeUri: MyAuthFunction/
       Environment:
         Variables:
-          TABLE_NAME: ClientesTable
-          REGION: us-east-1
+          SECRET_KEY: "your-secret-key"  # Adicione a chave secreta usada para JWT
       Policies:
         - AWSLambdaBasicExecutionRole
-      # TODO: Integração com API Gateway
-      # Este evento expõe o endpoint /authenticate para chamadas HTTP POST via API Gateway.
       Events:
         Authenticate:
           Type: Api

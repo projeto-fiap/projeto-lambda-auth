@@ -9,6 +9,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 
+import java.io.OutputStreamWriter;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Date;
@@ -45,12 +48,13 @@ public class App implements RequestHandler<APIGatewayProxyRequestEvent, APIGatew
                         .withBody("{\"authorized\": false, \"message\": \"CPF inválido.\"}");
             }
 
-            // Consulta ao banco de dados
-            boolean isAuthorized = consultaBanco(cpf);
+            // Enviar requisição ao API Gateway do backend principal
+            boolean isAuthorized = consultaAPIGatewayBackend(cpf, context);
+
             if (!isAuthorized) {
                 return response
                         .withStatusCode(404)
-                        .withBody("{\"authorized\": false, \"message\": \"CPF não encontrado. Cadastro necessário.\"}");
+                        .withBody("{\"authorized\": false, \"message\": \"CPF não encontrado.\"}");
             }
 
             // Geração do Token JWT
@@ -71,10 +75,25 @@ public class App implements RequestHandler<APIGatewayProxyRequestEvent, APIGatew
         return cpf.length() == 11 && cpf.matches("\\d+");
     }
 
-    private boolean consultaBanco(String cpf) {
-        // TODO: Substitua por lógica real de consulta a um banco de dados
-        // Simulação: Retornar true se o CPF for "12345678901"
-        return "12345678901".equals(cpf); // Cliente autenticado
+    private boolean consultaAPIGatewayBackend(String cpf, Context context) {
+        try {
+            // Configurar URL e requisição para o API Gateway do backend principal
+            String apiGatewayBackendUrl = "https://api-gateway-backend-url.com/api/v1/person/cpf?cpf=" + cpf;
+            URL url = new URL(apiGatewayBackendUrl);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("GET");
+            connection.setRequestProperty("Content-Type", "application/json");
+
+            int responseCode = connection.getResponseCode();
+            context.getLogger().log("API Gateway Backend response code: " + responseCode);
+
+            // CPF encontrado (200 OK)
+            return responseCode == 200;
+
+        } catch (Exception e) {
+            context.getLogger().log("Erro ao consultar API Gateway Backend: " + e.getMessage());
+            return false;
+        }
     }
 
     private String generateToken(String cpf) {
