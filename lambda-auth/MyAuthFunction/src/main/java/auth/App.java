@@ -20,7 +20,7 @@ public class App implements RequestHandler<APIGatewayProxyRequestEvent, APIGatew
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private static final String SECRET_KEY = System.getenv("SECRET_KEY");
-    private static final String API_GATEWAY_BACKEND_URL = System.getenv("N");
+    private static final String API_GATEWAY_BACKEND_URL = System.getenv("API_GATEWAY_BACKEND_URL");
 
     @Override
     public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent input, Context context) {
