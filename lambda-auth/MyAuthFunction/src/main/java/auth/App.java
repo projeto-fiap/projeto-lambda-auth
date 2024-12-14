@@ -19,7 +19,8 @@ import java.util.Date;
 public class App implements RequestHandler<APIGatewayProxyRequestEvent, APIGatewayProxyResponseEvent> {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private static final String SECRET_KEY = "your-secret-key"; // Substitua por uma chave segura
+    private static final String SECRET_KEY = System.getenv("SECRET_KEY");
+    private static final String API_GATEWAY_BACKEND_URL = System.getenv("API_GATEWAY_BACKEND_URL");
 
     @Override
     public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent input, Context context) {
@@ -29,35 +30,36 @@ public class App implements RequestHandler<APIGatewayProxyRequestEvent, APIGatew
         APIGatewayProxyResponseEvent response = new APIGatewayProxyResponseEvent().withHeaders(headers);
 
         try {
-            // Parse o JSON recebido
+            // Parse do corpo da requisição
             Map<String, String> body = objectMapper.readValue(input.getBody(), Map.class);
 
-            // Extrair CPF
+            // Extrair CPF e senha
             String cpf = body.get("cpf");
-            if (cpf == null || cpf.isEmpty()) {
-                context.getLogger().log("CPF não informado.");
+            String senha = body.get("senha");
+            if (cpf == null || cpf.isEmpty() || senha == null || senha.isEmpty()) {
+                context.getLogger().log("CPF ou senha não informados.");
                 return response
                         .withStatusCode(400)
-                        .withBody("{\"authorized\": false, \"message\": \"CPF não informado.\"}");
+                        .withBody("{\"authorized\": false, \"message\": \"CPF ou senha não informados.\"}");
             }
 
-            // Validação do CPF
+            // Validação do formato do CPF
             if (!isValidCPF(cpf)) {
                 return response
                         .withStatusCode(400)
                         .withBody("{\"authorized\": false, \"message\": \"CPF inválido.\"}");
             }
 
-            // Enviar requisição ao API Gateway do backend principal
-            boolean isAuthorized = consultaAPIGatewayBackend(cpf, context);
+            // Consultar o backend via API Gateway
+            boolean isAuthorized = consultaAPIGatewayBackend(cpf, senha, context);
 
             if (!isAuthorized) {
                 return response
-                        .withStatusCode(404)
-                        .withBody("{\"authorized\": false, \"message\": \"CPF não encontrado.\"}");
+                        .withStatusCode(401)
+                        .withBody("{\"authorized\": false, \"message\": \"Credenciais inválidas.\"}");
             }
 
-            // Geração do Token JWT
+            // Gerar Token JWT
             String token = generateToken(cpf);
             return response
                     .withStatusCode(200)
@@ -75,19 +77,30 @@ public class App implements RequestHandler<APIGatewayProxyRequestEvent, APIGatew
         return cpf.length() == 11 && cpf.matches("\\d+");
     }
 
-    private boolean consultaAPIGatewayBackend(String cpf, Context context) {
+    private boolean consultaAPIGatewayBackend(String cpf, String senha, Context context) {
         try {
-            // Configurar URL e requisição para o API Gateway do backend principal
-            String apiGatewayBackendUrl = "https://api-gateway-backend-url.com/api/v1/person/cpf?cpf=" + cpf;
-            URL url = new URL(apiGatewayBackendUrl);
+            // Configurar URL e conexão
+            URL url = new URL(API_GATEWAY_BACKEND_URL + "/api/v1/person/authenticate");
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestMethod("GET");
+            connection.setRequestMethod("POST");
             connection.setRequestProperty("Content-Type", "application/json");
+            connection.setDoOutput(true);
 
+            // Construir o JSON para enviar ao backend
+            Map<String, String> payload = new HashMap<>();
+            payload.put("cpf", cpf);
+            payload.put("senha", senha);
+
+            try (OutputStreamWriter writer = new OutputStreamWriter(connection.getOutputStream())) {
+                writer.write(objectMapper.writeValueAsString(payload));
+                writer.flush();
+            }
+
+            // Verificar a resposta do backend
             int responseCode = connection.getResponseCode();
             context.getLogger().log("API Gateway Backend response code: " + responseCode);
 
-            // CPF encontrado (200 OK)
+            // Credenciais válidas (200 OK)
             return responseCode == 200;
 
         } catch (Exception e) {

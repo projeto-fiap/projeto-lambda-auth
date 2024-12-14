@@ -21,6 +21,7 @@ Resources:
       Environment:
         Variables:
           SECRET_KEY: "your-secret-key"  # Adicione a chave secreta usada para JWT
+          API_GATEWAY_BACKEND_URL: "https://api-gateway-backend-url.com"  # URL do backend principal
       Policies:
         - AWSLambdaBasicExecutionRole
       Events:
