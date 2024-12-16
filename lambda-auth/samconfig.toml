@@ -14,6 +14,8 @@ capabilities = "CAPABILITY_IAM"
 confirm_changeset = true
 resolve_s3 = true
 resolve_image_repos = true
+s3_prefix = "lambda-auth"
+region = "us-east-1"
 
 [default.package.parameters]
 resolve_s3 = true

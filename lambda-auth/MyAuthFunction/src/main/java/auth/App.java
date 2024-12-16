@@ -77,29 +77,45 @@ public class App implements RequestHandler<APIGatewayProxyRequestEvent, APIGatew
 
     private boolean consultaBackend(String cpf, String senha, Context context) {
         try {
-            // Construir URL completa com o parâmetro CPF
+            // Construir URL com o CPF
             URL url = new URL(API_GATEWAY_BACKEND_URL + "?cpf=" + cpf);
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
             connection.setRequestMethod("GET");
             connection.setRequestProperty("Content-Type", "application/json");
 
-            // Se necessário, adicionar cabeçalho de autenticação
-            if (senha != null && !senha.isEmpty()) {
-                String auth = Base64.getEncoder().encodeToString((cpf + ":" + senha).getBytes());
-                connection.setRequestProperty("Authorization", "Basic " + auth);
-            }
+            // Adicionar cabeçalho de autenticação Basic
+            String auth = Base64.getEncoder().encodeToString((cpf + ":" + senha).getBytes());
+            connection.setRequestProperty("Authorization", "Basic " + auth);
 
+            // Ler código de resposta
             int responseCode = connection.getResponseCode();
             context.getLogger().log("Backend response code: " + responseCode);
 
-            // Retornar verdadeiro se o backend retornar 200
-            return responseCode == 200;
+            if (responseCode == 200) {
+                StringBuilder response = new StringBuilder();
+                try (var reader = new java.io.BufferedReader(new java.io.InputStreamReader(connection.getInputStream()))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        response.append(line);
+                    }
+                }
 
+                // Parsear JSON retornado pelo backend
+                Map<String, Object> responseBody = objectMapper.readValue(response.toString(), Map.class);
+
+                // Validar CPF e senha retornados
+                String returnedCpf = (String) ((Map<String, Object>) ((List<Object>) responseBody.get("document")).get(0)).get("value");
+                String returnedPassword = (String) responseBody.get("password");
+
+                // Retornar verdadeiro se CPF e senha forem válidos
+                return cpf.equals(returnedCpf) && senha.equals(returnedPassword);
+            }
         } catch (Exception e) {
             context.getLogger().log("Erro ao consultar backend: " + e.getMessage());
-            return false;
         }
+        return false;
     }
+
 
     private String generateToken(String cpf) {
         Algorithm algorithm = Algorithm.HMAC256(SECRET_KEY);
