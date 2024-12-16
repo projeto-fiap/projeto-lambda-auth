@@ -21,7 +21,7 @@ Resources:
       Environment:
         Variables:
           SECRET_KEY: "your-secret-key"
-          API_GATEWAY_BACKEND_URL: "https://ro4ghw5iqe.execute-api.us-east-2.amazonaws.com/prod"
+          API_GATEWAY_BACKEND_URL: "https://acmulpj854.execute-api.us-east-2.amazonaws.com/prod"
       Policies:
         - AWSLambdaBasicExecutionRole
       Events:

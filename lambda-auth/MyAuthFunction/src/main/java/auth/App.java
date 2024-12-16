@@ -2,73 +2,63 @@ package auth;
 
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
-import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyRequestEvent;
-import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.Base64;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
-public class App implements RequestHandler<APIGatewayProxyRequestEvent, APIGatewayProxyResponseEvent> {
+public class App implements RequestHandler<Map<String, Object>, Map<String, Object>> {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private static final String API_GATEWAY_BACKEND_URL = "https://ro4ghw5iqe.execute-api.us-east-2.amazonaws.com/prod/api/v1/person/cpf";
+    private static final String API_GATEWAY_BACKEND_URL = "https://acmulpj854.execute-api.us-east-2.amazonaws.com/prod/api/v1/person/cpf";
 
     @Override
-    public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent input, Context context) {
-        Map<String, String> headers = new HashMap<>();
-        headers.put("Content-Type", "application/json");
-        APIGatewayProxyResponseEvent response = new APIGatewayProxyResponseEvent().withHeaders(headers);
+    public Map<String, Object> handleRequest(Map<String, Object> input, Context context) {
 
         try {
-            // Obter o cabeçalho Authorization
-            String authHeader = input.getHeaders().get("Authorization");
+            // O evento do Custom Authorizer geralmente traz informações do método invocado em "methodArn" e headers em "headers"
+            Map<String, String> headers = (Map<String, String>) input.get("headers");
+            if (headers == null) {
+                headers = new HashMap<>();
+            }
 
-            // Verificar se o cabeçalho Authorization está presente
+            String authHeader = headers.get("Authorization");
+
+            // Se não houver cabeçalho Authorization, permitir acesso anônimo ou negar - aqui podemos negar.
             if (authHeader == null || authHeader.isEmpty()) {
-                // Permitir acesso anônimo
-                context.getLogger().log("Acesso anônimo permitido.");
-                return response
-                        .withStatusCode(200)
-                        .withBody("{\"authorized\": true, \"message\": \"Acesso anônimo permitido.\"}");
+                context.getLogger().log("Acesso anônimo detectado. Negando acesso.");
+                return generatePolicy("user", "Deny", getMethodArn(input));
             }
 
             // Validar cabeçalho Authorization
             if (!authHeader.startsWith("Basic ")) {
-                return response
-                        .withStatusCode(401)
-                        .withBody("{\"authorized\": false, \"message\": \"Cabeçalho 'Authorization' inválido.\"}");
+                context.getLogger().log("Authorization inválido.");
+                return generatePolicy("user", "Deny", getMethodArn(input));
             }
 
-            // Consultar o backend para validar as credenciais
+            // Consultar backend para validação
             boolean isValid = consultaBackend(authHeader, context);
 
-            if (!isValid) {
-                return response
-                        .withStatusCode(401)
-                        .withBody("{\"authorized\": false, \"message\": \"CPF ou senha inválidos.\"}");
+            if (isValid) {
+                // Retorna política Allow
+                context.getLogger().log("Credenciais válidas. Permitindo acesso.");
+                return generatePolicy("user", "Allow", getMethodArn(input));
+            } else {
+                // Retorna política Deny
+                context.getLogger().log("Credenciais inválidas. Negando acesso.");
+                return generatePolicy("user", "Deny", getMethodArn(input));
             }
-
-            // Retornar sucesso
-            return response
-                    .withStatusCode(200)
-                    .withBody("{\"authorized\": true, \"message\": \"Cliente autenticado com sucesso.\"}");
 
         } catch (Exception e) {
             context.getLogger().log("Erro inesperado: " + e.getMessage());
-            return response
-                    .withStatusCode(500)
-                    .withBody("{\"message\": \"Erro interno no servidor.\"}");
+            // Em caso de erro, nega o acesso.
+            return generatePolicy("user", "Deny", getMethodArn(input));
         }
     }
 
     private boolean consultaBackend(String authHeader, Context context) {
         try {
-            // Decodificar o cabeçalho Base64
             String credentials = new String(Base64.getDecoder().decode(authHeader.replace("Basic ", "")));
             String[] parts = credentials.split(":", 2);
             if (parts.length != 2) {
@@ -79,16 +69,12 @@ public class App implements RequestHandler<APIGatewayProxyRequestEvent, APIGatew
             String cpf = parts[0];
             String senha = parts[1];
 
-            // Construir URL com o CPF
             URL url = new URL(API_GATEWAY_BACKEND_URL + "?cpf=" + cpf);
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
             connection.setRequestMethod("GET");
             connection.setRequestProperty("Content-Type", "application/json");
-
-            // Adicionar cabeçalho de autenticação Basic
             connection.setRequestProperty("Authorization", authHeader);
 
-            // Ler código de resposta
             int responseCode = connection.getResponseCode();
             context.getLogger().log("Backend response code: " + responseCode);
 
@@ -101,19 +87,41 @@ public class App implements RequestHandler<APIGatewayProxyRequestEvent, APIGatew
                     }
                 }
 
-                // Parsear JSON retornado pelo backend
                 Map<String, Object> responseBody = objectMapper.readValue(response.toString(), Map.class);
 
                 // Validar CPF e senha retornados
-                String returnedCpf = (String) ((Map<String, Object>) ((java.util.List<Object>) responseBody.get("document")).get(0)).get("value");
+                String returnedCpf = (String) ((Map<String, Object>) ((List<Object>) responseBody.get("document")).get(0)).get("value");
                 String returnedPassword = (String) responseBody.get("password");
 
-                // Retornar verdadeiro se CPF e senha forem válidos
                 return cpf.equals(returnedCpf) && senha.equals(returnedPassword);
             }
         } catch (Exception e) {
             context.getLogger().log("Erro ao consultar backend: " + e.getMessage());
         }
         return false;
+    }
+
+    private String getMethodArn(Map<String, Object> input) {
+        // methodArn normalmente vem no input do authorizer.
+        // Exemplo: "arn:aws:execute-api:us-east-2:123456789012:abcdefghij/dev/GET/resource"
+        return (String) input.get("methodArn");
+    }
+
+    private Map<String, Object> generatePolicy(String principalId, String effect, String resource) {
+        Map<String, Object> policyDocument = new HashMap<>();
+        policyDocument.put("Version", "2012-10-17");
+
+        Map<String, Object> statement = new HashMap<>();
+        statement.put("Action", "execute-api:Invoke");
+        statement.put("Effect", effect);
+        statement.put("Resource", resource);
+
+        policyDocument.put("Statement", Collections.singletonList(statement));
+
+        Map<String, Object> authResponse = new HashMap<>();
+        authResponse.put("principalId", principalId);
+        authResponse.put("policyDocument", policyDocument);
+
+        return authResponse;
     }
 }
