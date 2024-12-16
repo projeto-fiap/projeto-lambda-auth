@@ -122,7 +122,7 @@ public class App implements RequestHandler<APIGatewayProxyRequestEvent, APIGatew
         return JWT.create()
                 .withClaim("cpf", cpf)
                 .withIssuedAt(new Date())
-                .withExpiresAt(new Date(System.currentTimeMillis() + 3600000)) // Token válido por 1 hora
+                .withExpiresAt(new Date(System.currentTimeMillis() + 3600000))
                 .sign(algorithm);
     }
 
@@ -131,7 +131,7 @@ public class App implements RequestHandler<APIGatewayProxyRequestEvent, APIGatew
         return JWT.create()
                 .withClaim("role", "anonymous")
                 .withIssuedAt(new Date())
-                .withExpiresAt(new Date(System.currentTimeMillis() + 3600000)) // Token válido por 1 hora
+                .withExpiresAt(new Date(System.currentTimeMillis() + 3600000))
                 .sign(algorithm);
     }
 }
