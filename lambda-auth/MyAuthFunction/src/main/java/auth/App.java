@@ -6,20 +6,16 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyRequestEvent;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.auth0.jwt.JWT;
-import com.auth0.jwt.algorithms.Algorithm;
 
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Date;
 
 public class App implements RequestHandler<APIGatewayProxyRequestEvent, APIGatewayProxyResponseEvent> {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private static final String SECRET_KEY = System.getenv("SECRET_KEY");
     private static final String API_GATEWAY_BACKEND_URL = "https://ro4ghw5iqe.execute-api.us-east-2.amazonaws.com/prod/api/v1/person/cpf";
 
     @Override
@@ -29,25 +25,36 @@ public class App implements RequestHandler<APIGatewayProxyRequestEvent, APIGatew
         APIGatewayProxyResponseEvent response = new APIGatewayProxyResponseEvent().withHeaders(headers);
 
         try {
-            // Obter JSON do cabeçalho X-Credentials
-            String jsonHeader = input.getHeaders().get("X-Credentials");
-            if (jsonHeader == null || jsonHeader.isEmpty()) {
+            // Obter o cabeçalho Authorization
+            String authHeader = input.getHeaders().get("Authorization");
+
+            // Verificar se o cabeçalho Authorization está presente
+            if (authHeader == null || authHeader.isEmpty()) {
+                // Permitir acesso anônimo
+                context.getLogger().log("Acesso anônimo permitido.");
                 return response
-                        .withStatusCode(400)
-                        .withBody("{\"authorized\": false, \"message\": \"Cabeçalho 'X-Credentials' não encontrado.\"}");
+                        .withStatusCode(200)
+                        .withBody("{\"authorized\": true, \"message\": \"Acesso anônimo permitido.\"}");
             }
 
-            // Parsear o JSON do cabeçalho
-            Map<String, String> body = objectMapper.readValue(jsonHeader, Map.class);
-            String cpf = body.get("cpf");
-            String senha = body.get("senha");
+            // Validar cabeçalho Authorization
+            if (!authHeader.startsWith("Basic ")) {
+                return response
+                        .withStatusCode(401)
+                        .withBody("{\"authorized\": false, \"message\": \"Cabeçalho 'Authorization' inválido.\"}");
+            }
 
-            // Caso CPF e senha estejam ausentes, retornar erro
-            if (cpf == null || cpf.isEmpty() || senha == null || senha.isEmpty()) {
+            // Decodificar o cabeçalho Base64
+            String credentials = new String(Base64.getDecoder().decode(authHeader.replace("Basic ", "")));
+            String[] parts = credentials.split(":", 2);
+            if (parts.length != 2) {
                 return response
                         .withStatusCode(400)
-                        .withBody("{\"authorized\": false, \"message\": \"CPF ou senha não informados.\"}");
+                        .withBody("{\"authorized\": false, \"message\": \"Formato de credenciais inválido.\"}");
             }
+
+            String cpf = parts[0];
+            String senha = parts[1];
 
             // Consultar o backend para validar as credenciais
             boolean isValid = consultaBackend(cpf, senha, context);
@@ -58,11 +65,10 @@ public class App implements RequestHandler<APIGatewayProxyRequestEvent, APIGatew
                         .withBody("{\"authorized\": false, \"message\": \"CPF ou senha inválidos.\"}");
             }
 
-            // Geração do Token JWT após autenticação bem-sucedida
-            String token = generateToken(cpf);
+            // Retornar sucesso
             return response
                     .withStatusCode(200)
-                    .withBody(String.format("{\"authorized\": true, \"message\": \"Cliente autenticado com sucesso.\", \"token\": \"%s\"}", token));
+                    .withBody("{\"authorized\": true, \"message\": \"Cliente autenticado com sucesso.\"}");
 
         } catch (Exception e) {
             context.getLogger().log("Erro inesperado: " + e.getMessage());
@@ -111,23 +117,5 @@ public class App implements RequestHandler<APIGatewayProxyRequestEvent, APIGatew
             context.getLogger().log("Erro ao consultar backend: " + e.getMessage());
         }
         return false;
-    }
-
-    private String generateToken(String cpf) {
-        Algorithm algorithm = Algorithm.HMAC256(SECRET_KEY);
-        return JWT.create()
-                .withClaim("cpf", cpf)
-                .withIssuedAt(new Date())
-                .withExpiresAt(new Date(System.currentTimeMillis() + 3600000))
-                .sign(algorithm);
-    }
-
-    private String generateAnonymousToken() {
-        Algorithm algorithm = Algorithm.HMAC256(SECRET_KEY);
-        return JWT.create()
-                .withClaim("role", "anonymous")
-                .withIssuedAt(new Date())
-                .withExpiresAt(new Date(System.currentTimeMillis() + 3600000))
-                .sign(algorithm);
     }
 }
