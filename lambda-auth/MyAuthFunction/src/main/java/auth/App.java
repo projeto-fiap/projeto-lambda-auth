@@ -31,7 +31,7 @@ public class App implements RequestHandler<APIGatewayProxyRequestEvent, APIGatew
 
         try {
             // Parse o JSON recebido
-            Map<String, String> body = objectMapper.readValue(input.getBody(), Map.class);
+            Map<String, String> body = objectMapper.readValue(input.getHeader(), Map.class);
             String cpf = body.get("cpf");
             String senha = body.get("senha");
 
