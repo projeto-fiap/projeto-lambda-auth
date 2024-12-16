@@ -1,14 +1,11 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: >
-  lambda-auth - Função Lambda para autenticação de clientes
-
+Description: "lambda-auth - Fun\xE7\xE3o Lambda para autentica\xE7\xE3o de clientes\n"
 Globals:
   Function:
     Timeout: 20
     MemorySize: 512
     Runtime: java17
-
 Resources:
   MyAuthFunction:
     Type: AWS::Serverless::Function
@@ -16,14 +13,14 @@ Resources:
       Handler: auth.App::handleRequest
       Runtime: java17
       Architectures:
-        - x86_64
-      CodeUri: MyAuthFunction/
+      - x86_64
+      CodeUri: MyAuthFunction
       Environment:
         Variables:
-          SECRET_KEY: "your-secret-key"
-          API_GATEWAY_BACKEND_URL: "https://ro4ghw5iqe.execute-api.us-east-2.amazonaws.com/prod"
+          SECRET_KEY: your-secret-key
+          API_GATEWAY_BACKEND_URL: https://nch98tb5bg.execute-api.us-east-1.amazonaws.com/prod
       Policies:
-        - AWSLambdaBasicExecutionRole
+      - AWSLambdaBasicExecutionRole
       Events:
         Authenticate:
           Type: Api
@@ -32,34 +29,40 @@ Resources:
             Method: post
             Auth:
               ApiKeyRequired: true
-
+    Metadata:
+      SamResourceId: MyAuthFunction
   ApiGatewayUsagePlan:
     Type: AWS::ApiGateway::UsagePlan
     Properties:
       UsagePlanName: MyAuthFunctionUsagePlan
       ApiStages:
-        - ApiId: !Ref ServerlessRestApi
-          Stage: Prod
+      - ApiId:
+          Ref: ServerlessRestApi
+        Stage: Prod
       Throttle:
         RateLimit: 10
         BurstLimit: 2
-
   ApiGatewayApiKey:
     Type: AWS::ApiGateway::ApiKey
     Properties:
       Name: MyAuthFunctionApiKey
       Enabled: true
       StageKeys:
-        - RestApiId: !Ref ServerlessRestApi
-          StageName: Prod
-
+      - RestApiId:
+          Ref: ServerlessRestApi
+        StageName: Prod
 Outputs:
   MyAuthApi:
-    Description: "API Gateway endpoint URL for MyAuthFunction"
-    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/authenticate"
+    Description: API Gateway endpoint URL for MyAuthFunction
+    Value:
+      Fn::Sub: https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/authenticate
   MyAuthFunctionArn:
-    Description: "MyAuth Lambda Function ARN"
-    Value: !GetAtt MyAuthFunction.Arn
+    Description: MyAuth Lambda Function ARN
+    Value:
+      Fn::GetAtt:
+      - MyAuthFunction
+      - Arn
   MyAuthFunctionApiKey:
-    Description: "API Key for accessing the API Gateway"
-    Value: !Ref ApiGatewayApiKey
+    Description: API Key for accessing the API Gateway
+    Value:
+      Ref: ApiGatewayApiKey
