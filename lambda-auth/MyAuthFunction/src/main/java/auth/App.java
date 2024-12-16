@@ -9,7 +9,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 
-import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.Base64;
@@ -30,23 +29,21 @@ public class App implements RequestHandler<APIGatewayProxyRequestEvent, APIGatew
         APIGatewayProxyResponseEvent response = new APIGatewayProxyResponseEvent().withHeaders(headers);
 
         try {
-            // Parse o JSON recebido
-            Map<String, String> body = objectMapper.readValue(input.getHeader(), Map.class);
+            // Obter JSON do cabeçalho X-Credentials
+            String jsonHeader = input.getHeaders().get("X-Credentials");
+            if (jsonHeader == null || jsonHeader.isEmpty()) {
+                return response
+                        .withStatusCode(400)
+                        .withBody("{\"authorized\": false, \"message\": \"Cabeçalho 'X-Credentials' não encontrado.\"}");
+            }
+
+            // Parsear o JSON do cabeçalho
+            Map<String, String> body = objectMapper.readValue(jsonHeader, Map.class);
             String cpf = body.get("cpf");
             String senha = body.get("senha");
 
-            // Caso CPF e senha não sejam fornecidos, gerar um token anônimo
-            if ((cpf == null || cpf.isEmpty()) && (senha == null || senha.isEmpty())) {
-                context.getLogger().log("Acesso anônimo permitido.");
-                String token = generateAnonymousToken();
-                return response
-                        .withStatusCode(200)
-                        .withBody(String.format("{\"authorized\": true, \"message\": \"Acesso anônimo permitido.\", \"token\": \"%s\"}", token));
-            }
-
-            // Caso CPF ou senha estejam ausentes, retornar erro
+            // Caso CPF e senha estejam ausentes, retornar erro
             if (cpf == null || cpf.isEmpty() || senha == null || senha.isEmpty()) {
-                context.getLogger().log("CPF ou senha não informados.");
                 return response
                         .withStatusCode(400)
                         .withBody("{\"authorized\": false, \"message\": \"CPF ou senha não informados.\"}");
@@ -104,7 +101,7 @@ public class App implements RequestHandler<APIGatewayProxyRequestEvent, APIGatew
                 Map<String, Object> responseBody = objectMapper.readValue(response.toString(), Map.class);
 
                 // Validar CPF e senha retornados
-                String returnedCpf = (String) ((Map<String, Object>) ((List<Object>) responseBody.get("document")).get(0)).get("value");
+                String returnedCpf = (String) ((Map<String, Object>) ((java.util.List<Object>) responseBody.get("document")).get(0)).get("value");
                 String returnedPassword = (String) responseBody.get("password");
 
                 // Retornar verdadeiro se CPF e senha forem válidos
@@ -115,7 +112,6 @@ public class App implements RequestHandler<APIGatewayProxyRequestEvent, APIGatew
         }
         return false;
     }
-
 
     private String generateToken(String cpf) {
         Algorithm algorithm = Algorithm.HMAC256(SECRET_KEY);
