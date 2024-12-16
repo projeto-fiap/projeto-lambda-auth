@@ -35,6 +35,7 @@ Resources:
 
   ApiGatewayUsagePlan:
     Type: AWS::ApiGateway::UsagePlan
+    DependsOn: ServerlessRestApiProdStage
     Properties:
       UsagePlanName: MyAuthFunctionUsagePlan
       ApiStages:
@@ -46,6 +47,7 @@ Resources:
 
   ApiGatewayApiKey:
     Type: AWS::ApiGateway::ApiKey
+    DependsOn: ServerlessRestApiProdStage
     Properties:
       Name: MyAuthFunctionApiKey
       Enabled: true

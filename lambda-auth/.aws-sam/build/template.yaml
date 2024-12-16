@@ -18,7 +18,7 @@ Resources:
       Environment:
         Variables:
           SECRET_KEY: your-secret-key
-          API_GATEWAY_BACKEND_URL: https://nch98tb5bg.execute-api.us-east-1.amazonaws.com/prod
+          API_GATEWAY_BACKEND_URL: https://ro4ghw5iqe.execute-api.us-east-2.amazonaws.com/prod
       Policies:
       - AWSLambdaBasicExecutionRole
       Events:
@@ -33,6 +33,7 @@ Resources:
       SamResourceId: MyAuthFunction
   ApiGatewayUsagePlan:
     Type: AWS::ApiGateway::UsagePlan
+    DependsOn: ServerlessRestApiProdStage
     Properties:
       UsagePlanName: MyAuthFunctionUsagePlan
       ApiStages:
@@ -44,6 +45,7 @@ Resources:
         BurstLimit: 2
   ApiGatewayApiKey:
     Type: AWS::ApiGateway::ApiKey
+    DependsOn: ServerlessRestApiProdStage
     Properties:
       Name: MyAuthFunctionApiKey
       Enabled: true

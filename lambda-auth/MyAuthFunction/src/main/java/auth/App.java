@@ -44,20 +44,8 @@ public class App implements RequestHandler<APIGatewayProxyRequestEvent, APIGatew
                         .withBody("{\"authorized\": false, \"message\": \"Cabeçalho 'Authorization' inválido.\"}");
             }
 
-            // Decodificar o cabeçalho Base64
-            String credentials = new String(Base64.getDecoder().decode(authHeader.replace("Basic ", "")));
-            String[] parts = credentials.split(":", 2);
-            if (parts.length != 2) {
-                return response
-                        .withStatusCode(400)
-                        .withBody("{\"authorized\": false, \"message\": \"Formato de credenciais inválido.\"}");
-            }
-
-            String cpf = parts[0];
-            String senha = parts[1];
-
             // Consultar o backend para validar as credenciais
-            boolean isValid = consultaBackend(cpf, senha, context);
+            boolean isValid = consultaBackend(authHeader, context);
 
             if (!isValid) {
                 return response
@@ -78,8 +66,19 @@ public class App implements RequestHandler<APIGatewayProxyRequestEvent, APIGatew
         }
     }
 
-    private boolean consultaBackend(String cpf, String senha, Context context) {
+    private boolean consultaBackend(String authHeader, Context context) {
         try {
+            // Decodificar o cabeçalho Base64
+            String credentials = new String(Base64.getDecoder().decode(authHeader.replace("Basic ", "")));
+            String[] parts = credentials.split(":", 2);
+            if (parts.length != 2) {
+                context.getLogger().log("Formato de credenciais inválido.");
+                return false;
+            }
+
+            String cpf = parts[0];
+            String senha = parts[1];
+
             // Construir URL com o CPF
             URL url = new URL(API_GATEWAY_BACKEND_URL + "?cpf=" + cpf);
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
@@ -87,8 +86,7 @@ public class App implements RequestHandler<APIGatewayProxyRequestEvent, APIGatew
             connection.setRequestProperty("Content-Type", "application/json");
 
             // Adicionar cabeçalho de autenticação Basic
-            String auth = Base64.getEncoder().encodeToString((cpf + ":" + senha).getBytes());
-            connection.setRequestProperty("Authorization", "Basic " + auth);
+            connection.setRequestProperty("Authorization", authHeader);
 
             // Ler código de resposta
             int responseCode = connection.getResponseCode();
