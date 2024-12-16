@@ -21,7 +21,7 @@ Resources:
       Environment:
         Variables:
           SECRET_KEY: "your-secret-key"
-          API_GATEWAY_BACKEND_URL: "https://api-gateway-backend-url.com"
+          API_GATEWAY_BACKEND_URL: "https://nch98tb5bg.execute-api.us-east-1.amazonaws.com/prod"
       Policies:
         - AWSLambdaBasicExecutionRole
       Events:
@@ -30,6 +30,28 @@ Resources:
           Properties:
             Path: /authenticate
             Method: post
+            Auth:
+              ApiKeyRequired: true
+
+  ApiGatewayUsagePlan:
+    Type: AWS::ApiGateway::UsagePlan
+    Properties:
+      UsagePlanName: MyAuthFunctionUsagePlan
+      ApiStages:
+        - ApiId: !Ref ServerlessRestApi
+          Stage: Prod
+      Throttle:
+        RateLimit: 10
+        BurstLimit: 2
+
+  ApiGatewayApiKey:
+    Type: AWS::ApiGateway::ApiKey
+    Properties:
+      Name: MyAuthFunctionApiKey
+      Enabled: true
+      StageKeys:
+        - RestApiId: !Ref ServerlessRestApi
+          StageName: Prod
 
 Outputs:
   MyAuthApi:
@@ -38,3 +60,6 @@ Outputs:
   MyAuthFunctionArn:
     Description: "MyAuth Lambda Function ARN"
     Value: !GetAtt MyAuthFunction.Arn
+  MyAuthFunctionApiKey:
+    Description: "API Key for accessing the API Gateway"
+    Value: !Ref ApiGatewayApiKey

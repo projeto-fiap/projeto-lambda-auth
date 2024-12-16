@@ -21,7 +21,7 @@ public class App implements RequestHandler<APIGatewayProxyRequestEvent, APIGatew
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private static final String SECRET_KEY = System.getenv("SECRET_KEY");
-    private static final String API_GATEWAY_BACKEND_URL = "http://localhost:8080/api/v1/person/cpf"; // Substitua com a URL pública do API Gateway
+    private static final String API_GATEWAY_BACKEND_URL = "https://nch98tb5bg.execute-api.us-east-1.amazonaws.com/prod/api/v1/person/cpf";
 
     @Override
     public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent input, Context context) {
@@ -77,20 +77,22 @@ public class App implements RequestHandler<APIGatewayProxyRequestEvent, APIGatew
 
     private boolean consultaBackend(String cpf, String senha, Context context) {
         try {
-            // Construir URL do API Gateway
+            // Construir URL completa com o parâmetro CPF
             URL url = new URL(API_GATEWAY_BACKEND_URL + "?cpf=" + cpf);
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
             connection.setRequestMethod("GET");
             connection.setRequestProperty("Content-Type", "application/json");
 
-            // Adicionar cabeçalho de autenticação HTTP Basic
-            String auth = Base64.getEncoder().encodeToString((cpf + ":" + senha).getBytes());
-            connection.setRequestProperty("Authorization", "Basic " + auth);
+            // Se necessário, adicionar cabeçalho de autenticação
+            if (senha != null && !senha.isEmpty()) {
+                String auth = Base64.getEncoder().encodeToString((cpf + ":" + senha).getBytes());
+                connection.setRequestProperty("Authorization", "Basic " + auth);
+            }
 
             int responseCode = connection.getResponseCode();
             context.getLogger().log("Backend response code: " + responseCode);
 
-            // Retorna verdadeiro se o backend validar o CPF
+            // Retornar verdadeiro se o backend retornar 200
             return responseCode == 200;
 
         } catch (Exception e) {

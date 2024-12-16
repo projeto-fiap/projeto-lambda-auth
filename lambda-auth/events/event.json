@@ -1,5 +1,5 @@
 {
-  "body": "{\"cpf\": \"12345678901\"}",
+  "body": "{\"cpf\": \"1234567890\", \"senha\": \"developer\"}",
   "headers": {
     "Content-Type": "application/json"
   },

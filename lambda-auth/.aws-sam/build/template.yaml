@@ -17,8 +17,8 @@ Resources:
       CodeUri: MyAuthFunction
       Environment:
         Variables:
-          TABLE_NAME: ClientesTable
-          REGION: us-east-1
+          SECRET_KEY: your-secret-key
+          API_GATEWAY_BACKEND_URL: http://localhost:8080/api/v1/person/cpf
       Policies:
       - AWSLambdaBasicExecutionRole
       Events:
